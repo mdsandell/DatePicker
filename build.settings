@@ -1,0 +1,14 @@
+settings = {
+	orientation = {
+		default = "portrait",
+		supported = {"portrait", "portraitUpsideDown"}--, "landscapeLeft", "landscapeRight"}
+	},
+	iphone = {
+		plist = {
+			CFBundleShortVersionString = "1.0",
+		}
+	},
+	android = {
+		versionCode = "1"
+	}
+}
