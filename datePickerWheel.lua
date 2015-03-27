@@ -25,20 +25,27 @@ local widget = require("widget")
 
 -- Create tables to hold data for months, days, and years.
 local dayCount = {
-	["January"]   = 31,
-	["February"]  = 28,
-	["March"]     = 31,
-	["April"]     = 30,
-	["May"]       = 31,
-	["June"]      = 30,
-	["July"]      = 31,
-	["August"]    = 31,
-	["September"] = 30,
-	["October"]   = 31,
-	["November"]  = 30,
-	["December"]  = 31
+	31, -- January
+	28, -- February
+	31, -- March
+	30, -- April
+	31, -- May
+	30, -- June
+	31, -- July
+	31, -- August
+	30, -- September
+	31, -- October
+	30, -- November
+	31, -- December
 }
-local months = {"January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"}
+
+-- Figure out the local month names.
+local months = {}
+local now = {year=2015, month=1, day=1, isdst=false}
+for i=1, 12 do
+	now.month = i
+	months[i] = os.date("%B", os.time(now))
+end
 
 -- Add the last 100 years.
 local years = {}
@@ -75,8 +82,8 @@ end
 local function daysInMonth(month, year)
 	--[[
 	:Parameters:
-		month : string
-			Name of month
+		month : int
+			Number of month
 		year : int
 			Year, used to calculate leap years
 	:Returns
@@ -84,7 +91,7 @@ local function daysInMonth(month, year)
 	:Rtype:
 		int
 	]]
-	if year and month == "February" and isLeapYear(year) then
+	if year and month == 2 and isLeapYear(year) then
 		return 29
 	end
 	return dayCount[month]
@@ -93,8 +100,8 @@ end
 local function daysTable(month, year)
 	--[[
 	:Parameters:
-		month : string
-			Name of month
+		month : int
+			Number of month
 		year : int
 			Year, used to calculate leap years
 	:Returns:
@@ -109,6 +116,9 @@ end
 
 local function newWheel(year, month, day)
 	--[[
+	Does not support years in the future. Only goes back 100 years.
+	These should be easy to adjust if needed.
+	
 	:Parameters:
 		year : int
 			Selected year
@@ -128,12 +138,12 @@ local function newWheel(year, month, day)
 			align = "center",
 			width = 60,
 			startIndex = day,
-			labels = daysTable(months[month], year)
+			labels = daysTable(month, year)
 		},
 		{ -- Years
 			align = "center",
 			width = 80,
-			startIndex = tonumber(os.date("%Y")) + 1 - year,
+			startIndex = currYear - year,
 			labels = years
 		}
 	}
@@ -141,29 +151,22 @@ local function newWheel(year, month, day)
 end
 
 function widget.newDatePickerWheel(year, month, day)
-	year = year or tonumber(os.date("%Y"))
+	year  = year  or tonumber(os.date("%Y"))
 	month = month or tonumber(os.date("%m"))
-	day = day or tonumber(os.date("%d"))
+	day   = day   or tonumber(os.date("%d"))
 	
 	local w = display.newGroup()
 	
-	w.selectedMonth = nil
-	w.selectedYear = nil
 	w.wheel = newWheel(year, month, day)
 	w:insert(w.wheel)
 	
-	function w.finalize(event)
-		print("Finalize Event Dispatched!")
-		Runtime:removeEventListener("enterFrame", w)
-	end
-	
-	function w.getValues()
-		return w.wheel:getValues()
+	function w:getValues()
+		return self.wheel:getValues()
 	end
 	
 	-- NOTE: If day or year column are still scrolling when month column changes, those will
 	-- snap back to their original selection.
-	function w.enterFrame(self)
+	function w:monitor()
 		-- Get selections from the picker wheel.
 		local values = self:getValues()
 		-- CORONA BUG: Sometimes the values can be nil.
@@ -172,18 +175,18 @@ function widget.newDatePickerWheel(year, month, day)
 		
 		local month = values[1].index
 		local year = tonumber(values[3].value)
-		local maxDays = daysInMonth(months[month], year)
+		local maxDays = daysInMonth(month, year)
 		
 		-- If the selected month has changed and the month has a different number of days than
 		-- before, or the selected month is February and the year changes to/from a leap year,
 		-- then redraw the picker wheel.
-		if (month ~= self.selectedMonth and maxDays ~= daysInMonth(months[self.selectedMonth], year)) or
+		if (month ~= self.selectedMonth and maxDays ~= daysInMonth(self.selectedMonth, year)) or
 		   (month == 2 and year ~= self.selectedYear and isLeapYear(year) ~= isLeapYear(self.selectedYear)) then
 			-- Make sure we no longer have a day selected greater than the number of days in
 			-- the current month.
 			local day = math.min(values[2].index, maxDays)
 			
-			-- Remove the old widget.
+			-- Remove the old wheel.
 			self.wheel:removeSelf()
 			
 			-- Create the new wheel.
@@ -195,6 +198,18 @@ function widget.newDatePickerWheel(year, month, day)
 			self.selectedYear = year
 		end
 	end
+	
+	function w:finalize(event)
+		timer.cancel(self.timer)
+		self.timer = nil
+		self.wheel:removeSelf()
+		self.wheel = nil
+	end
+	
+	w:addEventListener("finalize")
+	
+	-- Monitor for changes roughly 30 times per second.
+	w.timer = timer.performWithDelay(33, function() w:monitor() end, -1)
 	
 	return w
 end

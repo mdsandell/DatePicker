@@ -65,30 +65,6 @@ local function onAccept()
 	return true -- indicates successful touch
 end
 
-local function pause()
-	-- Stop the date picker updating.
-	Runtime:removeEventListener("enterFrame", datePicker)
-	loaded = false
-end
-
-local function resume()
-	if datePicker then
-		-- This starts the date picker "listening" for updates.
-		-- Be sure to remove it when leaving the scene!
-		Runtime:addEventListener("enterFrame", datePicker)
-	end
-	loaded = true
-end
-
--- create a function to handle all of the system events
-local function onSystem(event)
-    if event.type == "applicationSuspend" then
-        pause()
-    elseif event.type == "applicationResume" then
-    	resume()
-    end
-end
-
 ---------------------------------------------------------------------------------
 
 -- "scene:create()"
@@ -154,8 +130,7 @@ function scene:show(event)
 		-- Called when the scene is now on screen.
 		-- Insert code here to make the scene come alive.
 		-- Example: start timers, begin animation, play audio, etc.
-		Runtime:addEventListener("system", onSystem)
-		resume()
+		loaded = true
 	end
 end
 
@@ -168,8 +143,7 @@ function scene:hide(event)
 		-- Called when the scene is on screen (but is about to go off screen).
 		-- Insert code here to "pause" the scene.
 		-- Example: stop timers, stop animation, stop audio, etc.
-		Runtime:removeEventListener("system", onSystem)
-		pause()
+		loaded = false
 	elseif phase == "did" then
 		-- Called immediately after scene goes off screen.
 	end
